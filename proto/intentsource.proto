@@ -15,69 +15,77 @@ message IntentEvents {
 
 message IntentCreated {
   string intent_hash = 1;
-  string creator = 2;
+  string salt = 2;
   uint64 source_chain_id = 3;
   uint64 destination_chain_id = 4;
-  string reward_token = 5;
-  string reward_amount = 6;
-  uint64 block_number = 7;
-  string tx_hash = 8;
-  uint64 timestamp = 9;
+  string inbox_address = 5;
+  repeated TokenAmount route_tokens = 6;
+  repeated Call calls = 7;
+  string creator = 8;
+  string prover = 9;
+  uint64 deadline = 10;
+  uint64 native_value = 11;
+  repeated TokenAmount reward_tokens = 12;
+  uint64 block_number = 13;
+  string tx_hash = 14;
+  uint64 timestamp = 15;
+}
+
+message TokenAmount {
+  string token = 1;
+  string amount = 2;
+}
+
+message Call {
+  string target = 1;
+  string data = 2;
+  string value = 3;
 }
 
 message IntentFunded {
   string intent_hash = 1;
   string funder = 2;
-  string reward_token = 3;
-  string reward_amount = 4;
-  uint64 block_number = 5;
-  string tx_hash = 6;
-  uint64 timestamp = 7;
-}
-
-message IntentPartiallyFunded {
-  string intent_hash = 1;
-  string funder = 2;
-  string reward_token = 3;
-  string reward_amount = 4;
-  uint64 block_number = 5;
-  string tx_hash = 6;
-  uint64 timestamp = 7;
-}
-
-message Withdrawal {
-  string intent_hash = 1;
-  string claimant = 2;
-  string reward_token = 3;
-  string reward_amount = 4;
-  uint64 block_number = 5;
-  string tx_hash = 6;
-  uint64 timestamp = 7;
-}
-
-message Refund {
-  string intent_hash = 1;
-  string recipient = 2;
-  string reward_token = 3;
-  string reward_amount = 4;
-  uint64 block_number = 5;
-  string tx_hash = 6;
-  uint64 timestamp = 7;
-}
-
-message IntentProofChallenged {
-  string intent_hash = 1;
-  string challenger = 2;
   uint64 block_number = 3;
   string tx_hash = 4;
   uint64 timestamp = 5;
 }
 
+message IntentPartiallyFunded {
+  string intent_hash = 1;
+  string funder = 2;
+  uint64 block_number = 3;
+  string tx_hash = 4;
+  uint64 timestamp = 5;
+}
+
+message Withdrawal {
+  string hash = 1;
+  string recipient = 2;
+  uint64 block_number = 3;
+  string tx_hash = 4;
+  uint64 timestamp = 5;
+}
+
+message Refund {
+  string hash = 1;
+  string recipient = 2;
+  uint64 block_number = 3;
+  string tx_hash = 4;
+  uint64 timestamp = 5;
+}
+
+message IntentProofChallenged {
+  string intent_hash = 1;
+  uint64 block_number = 2;
+  string tx_hash = 3;
+  uint64 timestamp = 4;
+}
+
 message Fulfillment {
-  string fulfillment_hash = 1;
-  uint64 chain_id = 2;
-  string fulfiller = 3;
-  string recipient = 4;
+  string hash = 1;
+  uint64 source_chain_id = 2;
+  string prover = 3;
+  string claimant = 4;
   uint64 block_number = 5;
   string tx_hash = 6;
   uint64 timestamp = 7;

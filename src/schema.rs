@@ -123,6 +123,7 @@ pub const MONGO_INDEXES: &[MongoIndexSpec] = &[
     // IntentCreated indexes
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "intent_hash", unique: true },
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "creator", unique: false },
+    MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "prover", unique: false },
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "source_chain_id", unique: false },
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "destination_chain_id", unique: false },
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "reward_token", unique: false },
@@ -130,39 +131,34 @@ pub const MONGO_INDEXES: &[MongoIndexSpec] = &[
     MongoIndexSpec { collection: INTENT_CREATED_COLLECTION, field: "timestamp", unique: false },
     
     // IntentFunded indexes
-    MongoIndexSpec { collection: INTENT_FUNDED_COLLECTION, field: "intent_hash", unique: true },
+    MongoIndexSpec { collection: INTENT_FUNDED_COLLECTION, field: "intent_hash", unique: false },
     MongoIndexSpec { collection: INTENT_FUNDED_COLLECTION, field: "funder", unique: false },
-    MongoIndexSpec { collection: INTENT_FUNDED_COLLECTION, field: "reward_token", unique: false },
     MongoIndexSpec { collection: INTENT_FUNDED_COLLECTION, field: "block_number", unique: false },
     
     // IntentPartiallyFunded indexes
     MongoIndexSpec { collection: INTENT_PARTIALLY_FUNDED_COLLECTION, field: "intent_hash", unique: false },
     MongoIndexSpec { collection: INTENT_PARTIALLY_FUNDED_COLLECTION, field: "funder", unique: false },
-    MongoIndexSpec { collection: INTENT_PARTIALLY_FUNDED_COLLECTION, field: "reward_token", unique: false },
     MongoIndexSpec { collection: INTENT_PARTIALLY_FUNDED_COLLECTION, field: "block_number", unique: false },
     
     // Withdrawal indexes
-    MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "intent_hash", unique: true },
-    MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "claimant", unique: false },
-    MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "reward_token", unique: false },
+    MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "hash", unique: false },
+    MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "recipient", unique: false },
     MongoIndexSpec { collection: WITHDRAWAL_COLLECTION, field: "block_number", unique: false },
     
     // Refund indexes
-    MongoIndexSpec { collection: REFUND_COLLECTION, field: "intent_hash", unique: true },
+    MongoIndexSpec { collection: REFUND_COLLECTION, field: "hash", unique: false },
     MongoIndexSpec { collection: REFUND_COLLECTION, field: "recipient", unique: false },
-    MongoIndexSpec { collection: REFUND_COLLECTION, field: "reward_token", unique: false },
     MongoIndexSpec { collection: REFUND_COLLECTION, field: "block_number", unique: false },
     
     // IntentProofChallenged indexes
-    MongoIndexSpec { collection: INTENT_PROOF_CHALLENGED_COLLECTION, field: "intent_hash", unique: true },
-    MongoIndexSpec { collection: INTENT_PROOF_CHALLENGED_COLLECTION, field: "challenger", unique: false },
+    MongoIndexSpec { collection: INTENT_PROOF_CHALLENGED_COLLECTION, field: "intent_hash", unique: false },
     MongoIndexSpec { collection: INTENT_PROOF_CHALLENGED_COLLECTION, field: "block_number", unique: false },
     
     // Fulfillment indexes
-    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "fulfillment_hash", unique: true },
-    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "fulfiller", unique: false },
-    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "recipient", unique: false },
-    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "chain_id", unique: false },
+    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "hash", unique: false },
+    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "source_chain_id", unique: false },
+    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "prover", unique: false },
+    MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "claimant", unique: false },
     MongoIndexSpec { collection: FULFILLMENT_COLLECTION, field: "block_number", unique: false },
     
     // OrderFilled indexes

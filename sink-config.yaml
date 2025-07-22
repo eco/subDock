@@ -6,6 +6,7 @@ collections:
     indexes:
       - { "intent_hash": 1 }
       - { "creator": 1 }
+      - { "prover": 1 }
       - { "source_chain_id": 1 }
       - { "destination_chain_id": 1 }
       - { "reward_token": 1 }
@@ -16,42 +17,37 @@ collections:
     indexes:
       - { "intent_hash": 1 }
       - { "funder": 1 }
-      - { "reward_token": 1 }
       - { "block_number": 1 }
       
   intent_partially_funded:
     indexes:
       - { "intent_hash": 1 }
       - { "funder": 1 }
-      - { "reward_token": 1 }
       - { "block_number": 1 }
       
   withdrawal:
     indexes:
-      - { "intent_hash": 1 }
-      - { "claimant": 1 }
-      - { "reward_token": 1 }
+      - { "hash": 1 }
+      - { "recipient": 1 }
       - { "block_number": 1 }
       
   refund:
     indexes:
-      - { "intent_hash": 1 }
+      - { "hash": 1 }
       - { "recipient": 1 }
-      - { "reward_token": 1 }
       - { "block_number": 1 }
       
   intent_proof_challenged:
     indexes:
       - { "intent_hash": 1 }
-      - { "challenger": 1 }
       - { "block_number": 1 }
       
   fulfillment:
     indexes:
-      - { "fulfillment_hash": 1 }
-      - { "fulfiller": 1 }
-      - { "recipient": 1 }
-      - { "chain_id": 1 }
+      - { "hash": 1 }
+      - { "source_chain_id": 1 }
+      - { "prover": 1 }
+      - { "claimant": 1 }
       - { "block_number": 1 }
       
   order_filled:

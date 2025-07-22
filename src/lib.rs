@@ -3,7 +3,8 @@ mod schema;
 
 use pb::intentsource::v1::{
     IntentEvents, IntentCreated, IntentFunded, IntentPartiallyFunded, 
-    Withdrawal, Refund, IntentProofChallenged, Fulfillment, OrderFilled
+    Withdrawal, Refund, IntentProofChallenged, Fulfillment, OrderFilled,
+    TokenAmount, Call
 };
 use substreams::prelude::*;
 use substreams_ethereum::pb::eth::v2 as eth;
@@ -113,11 +114,14 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
         tables
             .create_row("intent_created", &event.intent_hash)
             .set("intent_hash", &event.intent_hash)
-            .set("creator", &event.creator)
+            .set("salt", &event.salt)
             .set("source_chain_id", event.source_chain_id)
             .set("destination_chain_id", event.destination_chain_id)
-            .set("reward_token", &event.reward_token)
-            .set("reward_amount", &event.reward_amount)
+            .set("inbox_address", &event.inbox_address)
+            .set("creator", &event.creator)
+            .set("prover", &event.prover)
+            .set("deadline", event.deadline)
+            .set("native_value", event.native_value)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -128,8 +132,6 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
             .create_row("intent_funded", &format!("{}_{}", event.intent_hash, event.block_number))
             .set("intent_hash", &event.intent_hash)
             .set("funder", &event.funder)
-            .set("reward_token", &event.reward_token)
-            .set("reward_amount", &event.reward_amount)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -140,8 +142,6 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
             .create_row("intent_partially_funded", &format!("{}_{}", event.intent_hash, event.block_number))
             .set("intent_hash", &event.intent_hash)
             .set("funder", &event.funder)
-            .set("reward_token", &event.reward_token)
-            .set("reward_amount", &event.reward_amount)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -149,11 +149,9 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
 
     for event in events.withdrawal {
         tables
-            .create_row("withdrawal", &format!("{}_{}", event.intent_hash, event.block_number))
-            .set("intent_hash", &event.intent_hash)
-            .set("claimant", &event.claimant)
-            .set("reward_token", &event.reward_token)
-            .set("reward_amount", &event.reward_amount)
+            .create_row("withdrawal", &format!("{}_{}", event.hash, event.block_number))
+            .set("hash", &event.hash)
+            .set("recipient", &event.recipient)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -161,11 +159,9 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
 
     for event in events.refund {
         tables
-            .create_row("refund", &format!("{}_{}", event.intent_hash, event.block_number))
-            .set("intent_hash", &event.intent_hash)
+            .create_row("refund", &format!("{}_{}", event.hash, event.block_number))
+            .set("hash", &event.hash)
             .set("recipient", &event.recipient)
-            .set("reward_token", &event.reward_token)
-            .set("reward_amount", &event.reward_amount)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -175,7 +171,6 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
         tables
             .create_row("intent_proof_challenged", &format!("{}_{}", event.intent_hash, event.block_number))
             .set("intent_hash", &event.intent_hash)
-            .set("challenger", &event.challenger)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -183,11 +178,11 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
 
     for event in events.fulfillment {
         tables
-            .create_row("fulfillment", &format!("{}_{}", event.fulfillment_hash, event.block_number))
-            .set("fulfillment_hash", &event.fulfillment_hash)
-            .set("chain_id", event.chain_id)
-            .set("fulfiller", &event.fulfiller)
-            .set("recipient", &event.recipient)
+            .create_row("fulfillment", &format!("{}_{}", event.hash, event.block_number))
+            .set("hash", &event.hash)
+            .set("source_chain_id", event.source_chain_id)
+            .set("prover", &event.prover)
+            .set("claimant", &event.claimant)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -208,26 +203,63 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
 
 // Event decoding functions
 fn decode_intent_created_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<IntentCreated> {
-    if log.topics.len() < 4 || log.data.len() < 64 {
+    if log.topics.len() < 4 {
         return None;
     }
 
+    // Parse indexed fields from topics
     let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
     let creator = format!("0x{}", hex::encode(&log.topics[2][12..]));
-    let source_chain_id = u64::from_be_bytes(log.topics[3][24..].try_into().ok()?);
+    let prover = format!("0x{}", hex::encode(&log.topics[3][12..]));
     
-    // Decode data field for destination_chain_id, reward_token, reward_amount
-    let destination_chain_id = u64::from_be_bytes(log.data[24..32].try_into().ok()?);
-    let reward_token = format!("0x{}", hex::encode(&log.data[44..64]));
-    let reward_amount = format!("0x{}", hex::encode(&log.data[64..96]));
+    // For simplicity, parse basic fields from data
+    // In production, you'd want to use proper ABI decoding
+    let mut offset = 0;
+    
+    // Skip complex ABI decoding for now and extract basic fields
+    let salt = if log.data.len() >= 32 {
+        format!("0x{}", hex::encode(&log.data[offset..offset+32]))
+    } else {
+        "0x".to_string()
+    };
+    offset += 32;
 
+    let source_chain_id = if log.data.len() >= offset + 32 {
+        u64::from_be_bytes(log.data[offset+24..offset+32].try_into().unwrap_or([0; 8]))
+    } else {
+        0
+    };
+    offset += 32;
+
+    let destination_chain_id = if log.data.len() >= offset + 32 {
+        u64::from_be_bytes(log.data[offset+24..offset+32].try_into().unwrap_or([0; 8]))
+    } else {
+        0
+    };
+    offset += 32;
+
+    let inbox_address = if log.data.len() >= offset + 32 {
+        format!("0x{}", hex::encode(&log.data[offset+12..offset+32]))
+    } else {
+        "0x".to_string()
+    };
+    
+    // For complex arrays like TokenAmount and Call, we'll skip detailed parsing
+    // and leave them empty for now - proper ABI decoding would be needed
+    
     Some(IntentCreated {
         intent_hash,
-        creator,
+        salt,
         source_chain_id,
         destination_chain_id,
-        reward_token,
-        reward_amount,
+        inbox_address,
+        route_tokens: vec![], // TODO: Implement proper ABI decoding
+        calls: vec![], // TODO: Implement proper ABI decoding
+        creator,
+        prover,
+        deadline: 0, // TODO: Extract from data
+        native_value: 0, // TODO: Extract from data
+        reward_tokens: vec![], // TODO: Implement proper ABI decoding
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -235,20 +267,17 @@ fn decode_intent_created_event(log: &eth::Log, block_number: u64, tx_hash: &str,
 }
 
 fn decode_intent_funded_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<IntentFunded> {
-    if log.topics.len() < 3 || log.data.len() < 64 {
+    if log.data.len() < 64 {
         return None;
     }
 
-    let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let funder = format!("0x{}", hex::encode(&log.topics[2][12..]));
-    let reward_token = format!("0x{}", hex::encode(&log.data[12..32]));
-    let reward_amount = format!("0x{}", hex::encode(&log.data[32..64]));
+    // Both fields are in data (not indexed)
+    let intent_hash = format!("0x{}", hex::encode(&log.data[0..32]));
+    let funder = format!("0x{}", hex::encode(&log.data[44..64])); // Skip padding
 
     Some(IntentFunded {
         intent_hash,
         funder,
-        reward_token,
-        reward_amount,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -256,20 +285,17 @@ fn decode_intent_funded_event(log: &eth::Log, block_number: u64, tx_hash: &str, 
 }
 
 fn decode_intent_partially_funded_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<IntentPartiallyFunded> {
-    if log.topics.len() < 3 || log.data.len() < 64 {
+    if log.data.len() < 64 {
         return None;
     }
 
-    let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let funder = format!("0x{}", hex::encode(&log.topics[2][12..]));
-    let reward_token = format!("0x{}", hex::encode(&log.data[12..32]));
-    let reward_amount = format!("0x{}", hex::encode(&log.data[32..64]));
+    // Both fields are in data (not indexed)
+    let intent_hash = format!("0x{}", hex::encode(&log.data[0..32]));
+    let funder = format!("0x{}", hex::encode(&log.data[44..64])); // Skip padding
 
     Some(IntentPartiallyFunded {
         intent_hash,
         funder,
-        reward_token,
-        reward_amount,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -277,20 +303,17 @@ fn decode_intent_partially_funded_event(log: &eth::Log, block_number: u64, tx_ha
 }
 
 fn decode_withdrawal_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<Withdrawal> {
-    if log.topics.len() < 3 || log.data.len() < 64 {
+    if log.topics.len() < 2 || log.data.len() < 32 {
         return None;
     }
 
-    let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let claimant = format!("0x{}", hex::encode(&log.topics[2][12..]));
-    let reward_token = format!("0x{}", hex::encode(&log.data[12..32]));
-    let reward_amount = format!("0x{}", hex::encode(&log.data[32..64]));
+    // hash is in data, recipient is indexed
+    let hash = format!("0x{}", hex::encode(&log.data[0..32]));
+    let recipient = format!("0x{}", hex::encode(&log.topics[1][12..]));
 
     Some(Withdrawal {
-        intent_hash,
-        claimant,
-        reward_token,
-        reward_amount,
+        hash,
+        recipient,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -298,20 +321,17 @@ fn decode_withdrawal_event(log: &eth::Log, block_number: u64, tx_hash: &str, tim
 }
 
 fn decode_refund_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<Refund> {
-    if log.topics.len() < 3 || log.data.len() < 64 {
+    if log.topics.len() < 2 || log.data.len() < 32 {
         return None;
     }
 
-    let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let recipient = format!("0x{}", hex::encode(&log.topics[2][12..]));
-    let reward_token = format!("0x{}", hex::encode(&log.data[12..32]));
-    let reward_amount = format!("0x{}", hex::encode(&log.data[32..64]));
+    // hash is in data, recipient is indexed
+    let hash = format!("0x{}", hex::encode(&log.data[0..32]));
+    let recipient = format!("0x{}", hex::encode(&log.topics[1][12..]));
 
     Some(Refund {
-        intent_hash,
+        hash,
         recipient,
-        reward_token,
-        reward_amount,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -319,16 +339,15 @@ fn decode_refund_event(log: &eth::Log, block_number: u64, tx_hash: &str, timesta
 }
 
 fn decode_intent_proof_challenged_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<IntentProofChallenged> {
-    if log.topics.len() < 3 {
+    if log.data.len() < 32 {
         return None;
     }
 
-    let intent_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let challenger = format!("0x{}", hex::encode(&log.topics[2][12..]));
+    // Only intentHash field in data (not indexed)
+    let intent_hash = format!("0x{}", hex::encode(&log.data[0..32]));
 
     Some(IntentProofChallenged {
         intent_hash,
-        challenger,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -340,16 +359,17 @@ fn decode_fulfillment_event(log: &eth::Log, block_number: u64, tx_hash: &str, ti
         return None;
     }
 
-    let fulfillment_hash = format!("0x{}", hex::encode(&log.topics[1]));
-    let chain_id = u64::from_be_bytes(log.topics[2][24..].try_into().ok()?);
-    let fulfiller = format!("0x{}", hex::encode(&log.topics[3][12..]));
-    let recipient = format!("0x{}", hex::encode(&log.data[12..32]));
+    // _hash, _sourceChainID, _prover are indexed; _claimant is in data
+    let hash = format!("0x{}", hex::encode(&log.topics[1]));
+    let source_chain_id = u64::from_be_bytes(log.topics[2][24..].try_into().ok()?);
+    let prover = format!("0x{}", hex::encode(&log.topics[3][12..]));
+    let claimant = format!("0x{}", hex::encode(&log.data[12..32])); // Skip padding
 
     Some(Fulfillment {
-        fulfillment_hash,
-        chain_id,
-        fulfiller,
-        recipient,
+        hash,
+        source_chain_id,
+        prover,
+        claimant,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,
@@ -357,12 +377,13 @@ fn decode_fulfillment_event(log: &eth::Log, block_number: u64, tx_hash: &str, ti
 }
 
 fn decode_order_filled_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<OrderFilled> {
-    if log.topics.len() < 3 {
+    if log.data.len() < 64 {
         return None;
     }
 
-    let order_id = format!("0x{}", hex::encode(&log.topics[1]));
-    let solver = format!("0x{}", hex::encode(&log.topics[2][12..]));
+    // Both _orderId and _solver are in data (not indexed)
+    let order_id = format!("0x{}", hex::encode(&log.data[0..32]));
+    let solver = format!("0x{}", hex::encode(&log.data[44..64])); // Skip padding
 
     Some(OrderFilled {
         order_id,
