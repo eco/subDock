@@ -9,6 +9,8 @@ message IntentEvents {
   repeated Withdrawal withdrawal = 4;
   repeated Refund refund = 5;
   repeated IntentProofChallenged intent_proof_challenged = 6;
+  repeated Fulfillment fulfillment = 7;
+  repeated OrderFilled order_filled = 8;
 }
 
 message IntentCreated {
@@ -66,6 +68,24 @@ message Refund {
 message IntentProofChallenged {
   string intent_hash = 1;
   string challenger = 2;
+  uint64 block_number = 3;
+  string tx_hash = 4;
+  uint64 timestamp = 5;
+}
+
+message Fulfillment {
+  string fulfillment_hash = 1;
+  uint64 chain_id = 2;
+  string fulfiller = 3;
+  string recipient = 4;
+  uint64 block_number = 5;
+  string tx_hash = 6;
+  uint64 timestamp = 7;
+}
+
+message OrderFilled {
+  string order_id = 1;
+  string solver = 2;
   uint64 block_number = 3;
   string tx_hash = 4;
   uint64 timestamp = 5;

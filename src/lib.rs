@@ -3,7 +3,7 @@ mod schema;
 
 use pb::intentsource::v1::{
     IntentEvents, IntentCreated, IntentFunded, IntentPartiallyFunded, 
-    Withdrawal, Refund, IntentProofChallenged
+    Withdrawal, Refund, IntentProofChallenged, Fulfillment, OrderFilled
 };
 use substreams::prelude::*;
 use substreams_ethereum::pb::eth::v2 as eth;
@@ -22,7 +22,12 @@ const WITHDRAWAL_EVENT_SIG: [u8; 32] = hex!("6653a45d3871e4110fa55dac0269f9f93a6
 const REFUND_EVENT_SIG: [u8; 32] = hex!("0ba6f12b978882904e7444c7a8fcadd2d9f692a6a97aa18e5fb44c3bbc580123");
 const INTENT_PROOF_CHALLENGED_EVENT_SIG: [u8; 32] = hex!("69f2194063569059c6cc65d4599038f27aa9590bbb3f008178b6d20c453b9e82");
 
-const CONTRACT_ADDRESS: [u8; 20] = hex!("2020ae689ED3e017450280CEA110d0ef6E640Da4");
+// Inbox contract events
+const FULFILLMENT_EVENT_SIG: [u8; 32] = hex!("4a817ec64beb8020b3e400f30f3b458110d5765d7a9d1ace4e68754ed2d082de");
+const ORDER_FILLED_EVENT_SIG: [u8; 32] = hex!("0555709e59fb225fcf12cc582a9e5f7fd8eea54c91f3dc500ab9d8c37c507770");
+
+const INTENTSOURCE_CONTRACT_ADDRESS: [u8; 20] = hex!("2020ae689ED3e017450280CEA110d0ef6E640Da4");
+const INBOX_CONTRACT_ADDRESS: [u8; 20] = hex!("04c816032A076dF65b411Bb3F31c8d569d411ee2");
 
 #[substreams::handlers::map]
 fn map_intent_events(blk: eth::Block) -> Result<IntentEvents, substreams::errors::Error> {
@@ -31,8 +36,11 @@ fn map_intent_events(blk: eth::Block) -> Result<IntentEvents, substreams::errors
     for trx in blk.transaction_traces.iter() {
         for call in trx.calls.iter() {
             for log in call.logs.iter() {
-                // Check if log is from our target contract
-                if log.address != CONTRACT_ADDRESS {
+                // Check if log is from our target contracts
+                let is_intentsource = log.address == INTENTSOURCE_CONTRACT_ADDRESS;
+                let is_inbox = log.address == INBOX_CONTRACT_ADDRESS;
+                
+                if !is_intentsource && !is_inbox {
                     continue;
                 }
 
@@ -46,34 +54,46 @@ fn map_intent_events(blk: eth::Block) -> Result<IntentEvents, substreams::errors
                 let timestamp = blk.timestamp.as_ref().unwrap().seconds as u64;
 
                 match topic {
-                    INTENT_CREATED_EVENT_SIG => {
+                    // IntentSource events
+                    INTENT_CREATED_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_intent_created_event(log, block_number, &tx_hash, timestamp) {
                             events.intent_created.push(event);
                         }
                     },
-                    INTENT_FUNDED_EVENT_SIG => {
+                    INTENT_FUNDED_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_intent_funded_event(log, block_number, &tx_hash, timestamp) {
                             events.intent_funded.push(event);
                         }
                     },
-                    INTENT_PARTIALLY_FUNDED_EVENT_SIG => {
+                    INTENT_PARTIALLY_FUNDED_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_intent_partially_funded_event(log, block_number, &tx_hash, timestamp) {
                             events.intent_partially_funded.push(event);
                         }
                     },
-                    WITHDRAWAL_EVENT_SIG => {
+                    WITHDRAWAL_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_withdrawal_event(log, block_number, &tx_hash, timestamp) {
                             events.withdrawal.push(event);
                         }
                     },
-                    REFUND_EVENT_SIG => {
+                    REFUND_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_refund_event(log, block_number, &tx_hash, timestamp) {
                             events.refund.push(event);
                         }
                     },
-                    INTENT_PROOF_CHALLENGED_EVENT_SIG => {
+                    INTENT_PROOF_CHALLENGED_EVENT_SIG if is_intentsource => {
                         if let Some(event) = decode_intent_proof_challenged_event(log, block_number, &tx_hash, timestamp) {
                             events.intent_proof_challenged.push(event);
+                        }
+                    },
+                    // Inbox events
+                    FULFILLMENT_EVENT_SIG if is_inbox => {
+                        if let Some(event) = decode_fulfillment_event(log, block_number, &tx_hash, timestamp) {
+                            events.fulfillment.push(event);
+                        }
+                    },
+                    ORDER_FILLED_EVENT_SIG if is_inbox => {
+                        if let Some(event) = decode_order_filled_event(log, block_number, &tx_hash, timestamp) {
+                            events.order_filled.push(event);
                         }
                     },
                     _ => {},
@@ -156,6 +176,28 @@ fn db_out(events: IntentEvents) -> Result<EntityChanges, substreams::errors::Err
             .create_row("intent_proof_challenged", &format!("{}_{}", event.intent_hash, event.block_number))
             .set("intent_hash", &event.intent_hash)
             .set("challenger", &event.challenger)
+            .set("block_number", event.block_number)
+            .set("tx_hash", &event.tx_hash)
+            .set("timestamp", event.timestamp);
+    }
+
+    for event in events.fulfillment {
+        tables
+            .create_row("fulfillment", &format!("{}_{}", event.fulfillment_hash, event.block_number))
+            .set("fulfillment_hash", &event.fulfillment_hash)
+            .set("chain_id", event.chain_id)
+            .set("fulfiller", &event.fulfiller)
+            .set("recipient", &event.recipient)
+            .set("block_number", event.block_number)
+            .set("tx_hash", &event.tx_hash)
+            .set("timestamp", event.timestamp);
+    }
+
+    for event in events.order_filled {
+        tables
+            .create_row("order_filled", &format!("{}_{}", event.order_id, event.block_number))
+            .set("order_id", &event.order_id)
+            .set("solver", &event.solver)
             .set("block_number", event.block_number)
             .set("tx_hash", &event.tx_hash)
             .set("timestamp", event.timestamp);
@@ -287,6 +329,44 @@ fn decode_intent_proof_challenged_event(log: &eth::Log, block_number: u64, tx_ha
     Some(IntentProofChallenged {
         intent_hash,
         challenger,
+        block_number,
+        tx_hash: tx_hash.to_string(),
+        timestamp,
+    })
+}
+
+fn decode_fulfillment_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<Fulfillment> {
+    if log.topics.len() < 4 || log.data.len() < 32 {
+        return None;
+    }
+
+    let fulfillment_hash = format!("0x{}", hex::encode(&log.topics[1]));
+    let chain_id = u64::from_be_bytes(log.topics[2][24..].try_into().ok()?);
+    let fulfiller = format!("0x{}", hex::encode(&log.topics[3][12..]));
+    let recipient = format!("0x{}", hex::encode(&log.data[12..32]));
+
+    Some(Fulfillment {
+        fulfillment_hash,
+        chain_id,
+        fulfiller,
+        recipient,
+        block_number,
+        tx_hash: tx_hash.to_string(),
+        timestamp,
+    })
+}
+
+fn decode_order_filled_event(log: &eth::Log, block_number: u64, tx_hash: &str, timestamp: u64) -> Option<OrderFilled> {
+    if log.topics.len() < 3 {
+        return None;
+    }
+
+    let order_id = format!("0x{}", hex::encode(&log.topics[1]));
+    let solver = format!("0x{}", hex::encode(&log.topics[2][12..]));
+
+    Some(OrderFilled {
+        order_id,
+        solver,
         block_number,
         tx_hash: tx_hash.to_string(),
         timestamp,

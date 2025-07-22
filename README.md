@@ -1,6 +1,6 @@
-# SubDock - IntentSource Substreams
+# SubDock - Eco Protocol Substreams
 
-A dockerized Substreams setup that indexes IntentSource contract events from Base L2 blockchain into MongoDB.
+A dockerized Substreams setup that indexes IntentSource and Inbox contract events from Base L2 blockchain into MongoDB.
 
 ## Prerequisites
 
@@ -32,15 +32,27 @@ A dockerized Substreams setup that indexes IntentSource contract events from Bas
 
 ## Contract Details
 
-- **Contract Address**: `0x2020ae689ED3e017450280CEA110d0ef6E640Da4`
-- **Blockchain**: Base L2 (via Alchemy RPC)
+### IntentSource Contract
+- **Address**: `0x2020ae689ED3e017450280CEA110d0ef6E640Da4`
+- **Purpose**: Cross-chain intent management system
 - **Events Indexed**:
-  - IntentCreated
-  - IntentFunded 
-  - IntentPartiallyFunded
-  - Withdrawal
-  - Refund
-  - IntentProofChallenged
+  - **IntentCreated**: New cross-chain intent published
+  - **IntentFunded**: Intent fully funded with rewards
+  - **IntentPartiallyFunded**: Intent partially funded
+  - **Withdrawal**: Successful reward withdrawal by prover
+  - **Refund**: Reward refunded to creator
+  - **IntentProofChallenged**: Intent proof challenged
+
+### Inbox Contract  
+- **Address**: `0x04c816032A076dF65b411Bb3F31c8d569d411ee2`
+- **Purpose**: Message inbox for cross-chain communication
+- **Events Indexed**:
+  - **Fulfillment**: Cross-chain message fulfilled
+  - **OrderFilled**: Order successfully filled
+
+### Network
+- **Blockchain**: Base L2 (Chain ID: 8453)
+- **RPC**: Alchemy Base Mainnet endpoint
 
 ## Access Points
 

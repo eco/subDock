@@ -38,3 +38,17 @@ collections:
       - { "intent_hash": 1 }
       - { "challenger": 1 }
       - { "block_number": 1 }
+      
+  fulfillment:
+    indexes:
+      - { "fulfillment_hash": 1 }
+      - { "fulfiller": 1 }
+      - { "recipient": 1 }
+      - { "chain_id": 1 }
+      - { "block_number": 1 }
+      
+  order_filled:
+    indexes:
+      - { "order_id": 1 }
+      - { "solver": 1 }
+      - { "block_number": 1 }

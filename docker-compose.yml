@@ -25,7 +25,8 @@ services:
     environment:
       - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
       - MONGODB_URI=mongodb://admin:password@mongodb:27017/substreams?authSource=admin
-      - CONTRACT_ADDRESS=0x2020ae689ED3e017450280CEA110d0ef6E640Da4
+      - INTENTSOURCE_CONTRACT_ADDRESS=0x2020ae689ED3e017450280CEA110d0ef6E640Da4
+      - INBOX_CONTRACT_ADDRESS=0x04c816032A076dF65b411Bb3F31c8d569d411ee2
       - RPC_ENDPOINT=https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}
     volumes:
       - ./substreams.yaml:/app/substreams.yaml
