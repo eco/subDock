@@ -1,0 +1,40 @@
+mongodb_uri: ${MONGODB_URI}
+database: substreams
+
+collections:
+  intent_created:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "creator": 1 }
+      - { "block_number": 1 }
+      - { "timestamp": 1 }
+  
+  intent_funded:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "funder": 1 }
+      - { "block_number": 1 }
+      
+  intent_partially_funded:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "funder": 1 }
+      - { "block_number": 1 }
+      
+  withdrawal:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "claimant": 1 }
+      - { "block_number": 1 }
+      
+  refund:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "recipient": 1 }
+      - { "block_number": 1 }
+      
+  intent_proof_challenged:
+    indexes:
+      - { "intent_hash": 1 }
+      - { "challenger": 1 }
+      - { "block_number": 1 }

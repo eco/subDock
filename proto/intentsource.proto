@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package intentsource.v1;
+
+message IntentEvents {
+  repeated IntentCreated intent_created = 1;
+  repeated IntentFunded intent_funded = 2;
+  repeated IntentPartiallyFunded intent_partially_funded = 3;
+  repeated Withdrawal withdrawal = 4;
+  repeated Refund refund = 5;
+  repeated IntentProofChallenged intent_proof_challenged = 6;
+}
+
+message IntentCreated {
+  string intent_hash = 1;
+  string creator = 2;
+  uint64 source_chain_id = 3;
+  uint64 destination_chain_id = 4;
+  string reward_token = 5;
+  string reward_amount = 6;
+  uint64 block_number = 7;
+  string tx_hash = 8;
+  uint64 timestamp = 9;
+}
+
+message IntentFunded {
+  string intent_hash = 1;
+  string funder = 2;
+  string reward_token = 3;
+  string reward_amount = 4;
+  uint64 block_number = 5;
+  string tx_hash = 6;
+  uint64 timestamp = 7;
+}
+
+message IntentPartiallyFunded {
+  string intent_hash = 1;
+  string funder = 2;
+  string reward_token = 3;
+  string reward_amount = 4;
+  uint64 block_number = 5;
+  string tx_hash = 6;
+  uint64 timestamp = 7;
+}
+
+message Withdrawal {
+  string intent_hash = 1;
+  string claimant = 2;
+  string reward_token = 3;
+  string reward_amount = 4;
+  uint64 block_number = 5;
+  string tx_hash = 6;
+  uint64 timestamp = 7;
+}
+
+message Refund {
+  string intent_hash = 1;
+  string recipient = 2;
+  string reward_token = 3;
+  string reward_amount = 4;
+  uint64 block_number = 5;
+  string tx_hash = 6;
+  uint64 timestamp = 7;
+}
+
+message IntentProofChallenged {
+  string intent_hash = 1;
+  string challenger = 2;
+  uint64 block_number = 3;
+  string tx_hash = 4;
+  uint64 timestamp = 5;
+}

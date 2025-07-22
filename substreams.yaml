@@ -1,0 +1,37 @@
+specVersion: v0.1.0
+package:
+  name: "intentsource_substream"
+  version: v1.0.0
+  url: https://github.com/eco/subDock
+  doc: |
+    Substream for tracking IntentSource contract events on Base L2
+
+network: base-mainnet
+
+imports:
+  entity: https://github.com/streamingfast/substreams-entity-change/releases/download/v1.3.2/substreams-entity-change-v1.3.2.spkg
+
+binaries:
+  default:
+    type: wasm/rust-v1
+    file: ./target/wasm32-unknown-unknown/release/intentsource_substream.wasm
+
+modules:
+  - name: map_intent_events
+    kind: map
+    initialBlock: 0
+    inputs:
+      - source: sf.ethereum.type.v2.Block
+    output:
+      type: proto:intentsource.v1.IntentEvents
+
+  - name: db_out
+    kind: map
+    initialBlock: 0
+    inputs:
+      - map: map_intent_events
+    output:
+      type: proto:sf.substreams.sink.entity.v1.EntityChanges
+
+params:
+  db_out: "contract=0x2020ae689ED3e017450280CEA110d0ef6E640Da4"

@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: substreams-mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: substreams
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - substreams-net
+
+  substreams:
+    build: .
+    container_name: substreams-processor
+    restart: always
+    depends_on:
+      - mongodb
+    environment:
+      - ALCHEMY_API_KEY=${ALCHEMY_API_KEY}
+      - MONGODB_URI=mongodb://admin:password@mongodb:27017/substreams?authSource=admin
+      - CONTRACT_ADDRESS=0x2020ae689ED3e017450280CEA110d0ef6E640Da4
+      - RPC_ENDPOINT=https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}
+    volumes:
+      - ./substreams.yaml:/app/substreams.yaml
+      - ./target:/app/target
+    networks:
+      - substreams-net
+    command: >
+      sh -c "
+        echo 'Starting Substreams processor...' &&
+        substreams run -e $${RPC_ENDPOINT} substreams.yaml db_out --start-block 0 --stop-block +10000000 |
+        substreams-sink-mongodb run mongodb://admin:password@mongodb:27017/substreams?authSource=admin
+      "
+
+  mongo-express:
+    image: mongo-express:1.0.2
+    container_name: mongo-express
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: admin
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      ME_CONFIG_MONGODB_URL: mongodb://admin:password@mongodb:27017/
+      ME_CONFIG_BASICAUTH: false
+    depends_on:
+      - mongodb
+    networks:
+      - substreams-net
+
+volumes:
+  mongodb_data:
+
+networks:
+  substreams-net:
+    driver: bridge
